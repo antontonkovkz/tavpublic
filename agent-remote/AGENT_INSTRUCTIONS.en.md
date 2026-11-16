@@ -1,62 +1,46 @@
-# Remote host instructions for AI agents
+# AI agent operating instructions
 
 [Русский](AGENT_INSTRUCTIONS.md)
 
-## Choose the transport
+## Primary setup: remote management over HTTPS
 
-HTTPS clients use https_remote.py. SSH/Chisel clients use scripts/ai_client.sh.
-Do not send Unix commands to Windows. See [README.en.md](README.en.md) and the
-complete [HTTPS installation guide](HTTPS_TRANSPORT.en.md).
-
-## HTTPS Windows clients
-
-Submit a UTF-8 PowerShell script file and query its returned ID:
+Use https_remote.py. Installation: [HTTPS_TRANSPORT.en.md](HTTPS_TRANSPORT.en.md).
+Create a UTF-8 PowerShell script and submit it:
 
 ```bash
 python3 https_remote.py submit --config /etc/agent-remote-https/operator.json windows-1 --script-file command.ps1 --timeout 300
 python3 https_remote.py status --config /etc/agent-remote-https/operator.json JOB_ID
 ```
 
-Submit multiple jobs without waiting for parallel execution. The client's workers
-setting limits concurrency. done means a result arrived: inspect exit_code and
-reason. Never retry unknown jobs without checking actual machine state. Never
-print tokens. Use explicit PowerShell/native executable error handling.
+Replace JOB_ID with the ID returned by submit. Submit several jobs without waiting;
+the client's workers setting limits execution. Do not assume SYSTEM privileges:
+commands run under the installed client's account.
 
-## SSH/Chisel clients
+Before changes inspect whoami, hostname, working directory and relevant service
+state. Coordinate parallel edits to shared files. Prefer idempotent operations;
+do not assume a PC is disposable. Do not delete data without a task-related need.
+Never print tokens or private configurations.
 
-inventory/clients.tsv is the source of truth for name, reverse port and SSH user.
-The optional sixth field is OS (linux/windows); older records default to Linux.
-Do not assume common users, ports, root access or availability across clients.
-The helper defaults to private key /root/.ssh/ai_chisel_ed25519.
+Send PowerShell, not Bash, to Windows. Use `$ErrorActionPreference = 'Stop'` and
+explicit `exit $LASTEXITCODE` after executables where needed. done means a result
+arrived: check exit_code and reason. Never retry unknown without checking actual
+machine state. Further applications must obey hidden execution requirements.
+
+## Alternative: SSH/Chisel
+
+Use only for clients explicitly configured for this transport. Installation and
+diagnostics: [CHISEL.en.md](CHISEL.en.md). Connection parameters come from
+inventory/clients.tsv; the default key is /root/.ssh/ai_chisel_ed25519. Do not
+assume common users or ports.
 
 ```bash
 scripts/ai_client.sh list
 scripts/ai_client.sh show client-1
 scripts/ai_client.sh check client-1
 scripts/ai_client.sh run client-1 -- sh -lc 'whoami && hostname && pwd'
+scripts/ai_client.sh ps win-1 'whoami; hostname; Get-Location'
 ```
 
-Prefer the helper over direct ssh and avoid interactive sessions unless needed.
-Use `scripts/ai_client.sh ssh client-1` when an interactive session is necessary.
-For Windows use `scripts/ai_client.sh ps win-1 'whoami; hostname; Get-Location'`.
-The ps command requires iconv/base64 on the server. Do not send sh, uname or
-systemctl to Windows. See the README for Windows account/ACL setup.
-
-## Inspect before changes
-
-Verify the current user, hostname, directory and relevant service state. Prefer
-idempotent commands. Do not delete data without a task-related need or assume a
-host is disposable. Use the supported inventory helpers when available.
-
-For Linux service tasks inspect:
-
-```bash
-scripts/ai_client.sh run client-1 -- sh -lc 'systemctl is-system-running || true'
-scripts/ai_client.sh run client-1 -- sh -lc 'systemctl status SERVICE --no-pager || true'
-```
-
-If SSH is unreachable, inspect chisel-server on the server, then chisel-client
-and ssh services on Ubuntu and authorized_keys ownership/permissions. On Windows
-inspect AgentRemoteTunnel, sshd, and C:\ProgramData\agent-remote\tunnel.log.
-That log is written after Chisel exits. Remote child processes must obey the
-user's hidden execution requirements.
+Use run with sh for Linux, ps for Windows. Do not send systemctl or uname to
+Windows. Prefer the helper over direct SSH; use `scripts/ai_client.sh ssh client-1`
+for an interactive session only when necessary.
