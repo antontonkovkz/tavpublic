@@ -1,5 +1,7 @@
 # Windows без Chisel: установка и эксплуатация
 
+[English](HTTPS_TRANSPORT.en.md)
+
 ## Архитектура
 
 `https_remote.py` содержит сервер очереди SQLite, Windows-клиент и CLI оператора.

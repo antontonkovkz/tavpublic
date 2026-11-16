@@ -1,4 +1,6 @@
-# Chisel Reverse SSH Bootstrap
+# agent-remote: удалённое выполнение команд
+
+[English](README.en.md)
 
 ## Windows без Chisel
 
@@ -305,20 +307,20 @@ systemctl status ssh --no-pager
 - Для варианта `Remote one-liner` нужно заранее опубликовать `scripts/install_ubuntu_client.sh` по доступному URL и при необходимости передать `CLIENT_SCRIPT_URL=...`.
 
 
-## Windows clients
+## Windows-клиенты через Chisel и SSH
 
-Prepare on the Linux AI server with `scripts/prepare_client_bootstrap.sh --os windows --client-name win-1 --ssh-user ATonkov --server-host ai.example.com`.
-Run the generated installer command in elevated PowerShell from a Windows clone of this repository. It configures OpenSSH and a SYSTEM startup task named `AgentRemoteTunnel`, with automatic retries and no interactive console. No desktop/mouse automation is provided.
+На Linux-сервере подготовьте подключение командой `scripts/prepare_client_bootstrap.sh --os windows --client-name win-1 --ssh-user ATonkov --server-host ai.example.com`.
+Выполните напечатанную команду установки в PowerShell от администратора из Windows-копии проекта. Она настраивает OpenSSH и задачу `AgentRemoteTunnel` от SYSTEM с запуском при загрузке, повторными попытками и без консольного окна. Управление мышью и экраном не предусмотрено.
 
-Inventory gains an optional sixth column `os` (`linux` or `windows`); old five-column records remain Linux. Add manually with `scripts/ai_client.sh add win-1 2201 ATonkov demo "Windows PC" windows`.
+В таблице клиентов есть необязательный шестой столбец `os` (`linux` или `windows`). Старые записи из пяти столбцов считаются Linux. Пример ручного добавления: `scripts/ai_client.sh add win-1 2201 ATonkov demo "Windows PC" windows`.
 
-For Windows use `scripts/ai_client.sh ps win-1 'Get-Location; hostname; whoami'` and `scripts/ai_client.sh check win-1`. The `ps` command requires iconv and base64 on the server. PowerShell scripts use EncodedCommand; use explicit `exit` for native program failures. Never send `sh -lc`, `uname` or `systemctl` to Windows.
+Для Windows используйте `scripts/ai_client.sh ps win-1 'Get-Location; hostname; whoami'` и `scripts/ai_client.sh check win-1`. Команда `ps` требует iconv и base64 на сервере. Скрипты передаются через EncodedCommand; для ошибок внешних программ явно задавайте код через `exit`. Не отправляйте на Windows команды `sh -lc`, `uname` и `systemctl`.
 
-Files and credentials are under `C:\ProgramData\agent-remote` with access restricted to SYSTEM and Administrators. The installer uses an existing local account; sign in once before installing for a non-admin account. OpenSSH authorized_keys ACLs are configured for that account. SSH permissions follow the selected account. Existing SSH configuration is preserved; custom authentication rules may need manual adjustment. The installer requires administrator privileges and internet access. Windows SSH should be restricted to loopback/firewall policy when only tunnel access is needed.
+Файлы и секреты находятся в `C:\ProgramData\agent-remote`, доступ ограничен SYSTEM и администраторами. Для обычной локальной учётной записи сначала войдите в Windows, чтобы создать профиль. Для доменной учётной записи запускайте установку с повышенными правами от неё же. Установщик настраивает права authorized_keys; права SSH соответствуют выбранному пользователю. Существующая конфигурация SSH сохраняется, нестандартные правила аутентификации могут потребовать ручной настройки. Нужны права администратора и Интернет. Если SSH нужен только через туннель, ограничьте прямой доступ к нему настройкой прослушивания или межсетевым экраном.
 
-Inspect `Get-ScheduledTaskInfo AgentRemoteTunnel`, `Get-Service sshd`, and `C:\ProgramData\agent-remote\tunnel.log` for diagnostics (the log is written when the tunnel process exits). Remove the tunnel with `Stop-ScheduledTask AgentRemoteTunnel; Unregister-ScheduledTask AgentRemoteTunnel -Confirm:$false`; this preserves SSH and its keys. Child processes launched by remote scripts must also use hidden execution when needed.
+Диагностика: `Get-ScheduledTaskInfo AgentRemoteTunnel`, `Get-Service sshd` и `C:\ProgramData\agent-remote\tunnel.log` (журнал записывается после завершения процесса). Удаление задачи: `Stop-ScheduledTask AgentRemoteTunnel; Unregister-ScheduledTask AgentRemoteTunnel -Confirm:$false`. SSH и ключи сохраняются. Дочерние процессы удалённых скриптов тоже должны соблюдать скрытый запуск, когда он требуется.
 
 
-## HTTPS transport without Chisel
+## HTTPS-транспорт без Chisel
 
-Experimental queued PowerShell execution with configurable concurrency: [HTTPS_TRANSPORT.md](HTTPS_TRANSPORT.md). Set `workers` in the Windows client configuration (1?32, default 4); restart the client after changing it.
+Выполнение PowerShell через очередь с настраиваемой параллельностью: [HTTPS_TRANSPORT.md](HTTPS_TRANSPORT.md). Параметр `workers` задаётся в конфигурации Windows-клиента: от 1 до 32, по умолчанию 4. После изменения перезапустите клиент.
