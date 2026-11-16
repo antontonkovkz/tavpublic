@@ -308,10 +308,10 @@ systemctl status ssh --no-pager
 
 ## Windows-клиенты через Chisel и SSH
 
-На Linux-сервере подготовьте подключение командой `scripts/prepare_client_bootstrap.sh --os windows --client-name win-1 --ssh-user ATonkov --server-host ai.example.com`.
+На Linux-сервере подготовьте подключение командой `scripts/prepare_client_bootstrap.sh --os windows --client-name win-1 --ssh-user operator --server-host ai.example.com`.
 Выполните напечатанную команду установки в PowerShell от администратора из Windows-копии проекта. Она настраивает OpenSSH и задачу `AgentRemoteTunnel` от SYSTEM с запуском при загрузке, повторными попытками и без консольного окна. Управление мышью и экраном не предусмотрено.
 
-В таблице клиентов есть необязательный шестой столбец `os` (`linux` или `windows`). Старые записи из пяти столбцов считаются Linux. Пример ручного добавления: `scripts/ai_client.sh add win-1 2201 ATonkov demo "Windows PC" windows`.
+В таблице клиентов есть необязательный шестой столбец `os` (`linux` или `windows`). Старые записи из пяти столбцов считаются Linux. Пример ручного добавления: `scripts/ai_client.sh add win-1 2201 operator demo "Windows PC" windows`.
 
 Для Windows используйте `scripts/ai_client.sh ps win-1 'Get-Location; hostname; whoami'` и `scripts/ai_client.sh check win-1`. Команда `ps` требует iconv и base64 на сервере. Скрипты передаются через EncodedCommand; для ошибок внешних программ явно задавайте код через `exit`. Не отправляйте на Windows команды `sh -lc`, `uname` и `systemctl`.
 

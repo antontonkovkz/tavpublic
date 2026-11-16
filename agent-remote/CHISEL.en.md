@@ -110,7 +110,7 @@ Prepare on the Linux server:
 
 ```bash
 scripts/prepare_client_bootstrap.sh --os windows --client-name win-1 \
-  --ssh-user ATonkov --server-host ai.example.com
+  --ssh-user operator --server-host ai.example.com
 ```
 
 Run the generated installer command in elevated PowerShell from a Windows copy
@@ -125,7 +125,7 @@ need adjustment. Installation requires administrator rights and Internet access.
 Restrict direct SSH access through listener/firewall rules if only the tunnel is needed.
 
 ```bash
-scripts/ai_client.sh add win-1 2201 ATonkov demo "Windows PC" windows
+scripts/ai_client.sh add win-1 2201 operator demo "Windows PC" windows
 scripts/ai_client.sh check win-1
 scripts/ai_client.sh ps win-1 'Get-Location; hostname; whoami'
 ```

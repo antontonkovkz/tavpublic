@@ -11,11 +11,12 @@ SSH, Chisel и входящие порты на ПК не нужны. Кажда
 
 ## Установка Linux-сервера
 
-Выполняйте от root. Репозиторий текущего развёртывания — `/tavdata/agent-remote`.
+Выполняйте от root. В примере репозиторий GitHub находится в `/opt/tavpublic`,
+а код проекта — в его подкаталоге agent-remote. Для новой установки:
 
 ```bash
-cd /tavdata/agent-remote
-git pull
+git clone https://github.com/antontonkovkz/tavpublic.git /opt/tavpublic
+cd /opt/tavpublic/agent-remote
 python3 --version
 install -d -m 700 /etc/agent-remote-https
 install -d -m 755 /var/lib/agent-remote-https
@@ -59,7 +60,7 @@ After=network.target
 DynamicUser=yes
 StateDirectory=agent-remote-https
 LoadCredential=server.json:/etc/agent-remote-https/server.json
-ExecStart=/usr/bin/python3 /tavdata/agent-remote/https_remote.py serve --config %d/server.json
+ExecStart=/usr/bin/python3 /opt/tavpublic/agent-remote/https_remote.py serve --config %d/server.json
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=yes
@@ -83,7 +84,7 @@ systemctl status agent-remote-https --no-pager
 ## HTTPS и Caddy
 
 Нужны DNS-имя и действующий сертификат. Для отдельного сайта достаточно
-`reverse_proxy 127.0.0.1:9320`. В текущем развёртывании в блоке edge.tavhome.online
+`reverse_proxy 127.0.0.1:9320`. В текущем развёртывании в блоке remote.example.com
 перед общим обработчиком handle добавлено:
 
 ```caddy
@@ -92,13 +93,13 @@ handle_path /agent-remote/* {
 }
 ```
 
-handle_path удаляет префикс. URL клиента: `https://edge.tavhome.online/agent-remote`.
+handle_path удаляет префикс. URL клиента: `https://remote.example.com/agent-remote`.
 Сохраните копию Caddyfile перед редактированием, затем выполните:
 
 ```bash
 caddy validate --config /etc/caddy/Caddyfile
 systemctl reload caddy
-curl -i -X POST https://edge.tavhome.online/agent-remote/poll -d '{}'
+curl -i -X POST https://remote.example.com/agent-remote/poll -d '{}'
 ```
 
 Без токена ожидается 401. 502 означает недоступность backend. Удалённый API требует
@@ -106,12 +107,14 @@ HTTPS; HTTP разрешён CLI только на loopback для локаль�
 
 ## Подготовка Windows
 
-Клонируйте проект в `C:\my_data\remote\agent-remote`. Установите Python 3.10+.
+Клонируйте репозиторий в `C:\work\tavpublic`. Код проекта находится в agent-remote.
+Установите Python 3.10+.
 Для SYSTEM нужна установка Python для всех пользователей. Пользовательский режим
 допускает Python в профиле пользователя.
 
 ```powershell
-cd C:\my_data\remote\agent-remote
+git clone https://github.com/antontonkovkz/tavpublic.git C:\work\tavpublic
+cd C:\work\tavpublic\agent-remote
 python --version
 python -m pip install truststore
 (Get-Command pythonw.exe).Source
@@ -127,10 +130,10 @@ CREATE_NO_WINDOW. Запускаемые удалённым скриптом п�
 
 ```json
 {
-  "url": "https://edge.tavhome.online/agent-remote",
+  "url": "https://remote.example.com/agent-remote",
   "token": "REPLACE_WITH_CLIENT_TOKEN",
   "workers": 4,
-  "spool": "C:/Users/ATonkov/AppData/Local/agent-remote-https/results"
+  "spool": "C:/Users/operator/AppData/Local/agent-remote-https/results"
 }
 ```
 
@@ -190,7 +193,7 @@ Get-Date -Format o
 ```
 
 ```bash
-cd /tavdata/agent-remote
+cd /opt/tavpublic/agent-remote
 python3 https_remote.py submit --config /etc/agent-remote-https/operator.json windows-1 --script-file /tmp/remote-command.ps1 --timeout 300
 python3 https_remote.py status --config /etc/agent-remote-https/operator.json JOB_ID
 ```
@@ -236,37 +239,81 @@ Windows: `Get-ScheduledTask AgentRemoteHTTPSUser`,
 При TLS-ошибке проверьте время, сертификат и truststore в используемом Python.
 
 Команды используют общие файлы: согласовывайте параллельные изменения. Таймаут
-1–86400 секунд. При таймауте/переполнении вывода taskkill завершает дерево процессов.
-Каждый поток результата ограничен 128 КиБ; периодическая проверка допускает
-кратковременное превышение размера временных файлов. Отсоединённые дети не покрыты
-полной гарантией завершения.
+1–86400 секунд. Процесс создаётся приостановленным, помещается в Windows Job Object
+с KILL_ON_JOB_CLOSE и только затем запускается. Закрытие клиента или таймаут завершает
+его процессы и потомков, включая запущенные через Start-Process. Процессы, созданные
+внешней службой вне Job Object, этим механизмом не контролируются.
+Ответ сохраняет начало и конец каждого потока в пределах примерно 128 КиБ.
+Усечение ответа не прерывает сборку. Отдельный аварийный порог временного вывода —
+100 МиБ суммарно; проверка периодическая и допускает кратковременное превышение.
 
-SQLite сохраняет задания. Выданные команды автоматически не повторяются: они могли
+SQLite сохраняет задания. Подтверждённые команды автоматически не повторяются: они могли
 уже изменить ПК. После timeout + 120 секунд без ответа статус отображается unknown;
 перед повтором проверьте фактическое состояние. Готовые ответы сохраняются в spool
 и повторно отправляются после восстановления сети. Сбой до записи spool может
 потерять ответ. В базе остаются команды и вывод: ограничивайте доступ и следите
-за размером. Нет отмены, передачи файлов, очистки истории и desktop automation.
+за размером. Передача файлов и управление экраном не реализованы; отмена доступна
+только до начала исполнения. Остановка работающей команды вручную через API пока не реализована.
 
-## Текущее развёртывание и проверка
+## Обновление протокола и новые настройки
 
-На 16 ноября 2026: сервер 89.46.237.38, код `/tavdata/agent-remote`, служба
-agent-remote-https, URL `https://edge.tavhome.online/agent-remote`, клиент windows-1,
-ПК DMW12105, пользователь `detmir-group\atonkov`, workers=4.
-Первоначальная задача AgentRemoteHTTPSUser ссылается прямо на
-`C:\my_data\remote\agent-remote\https_remote.py` и конфигурацию
-`C:\my_data\remote\agent-remote\.local\https-client.json`. До переустановки
-меняйте этот файл, а не LOCALAPPDATA из установщика выше.
+Новый клиент и сервер используют протокол 2: queued → claimed → running → done.
+Клиент обязан получить успешный `/start` перед выполнением. Если ответ `/poll`
+потерян, claimed возвращается в queued через 60 секунд с новым случайным ключом
+выдачи. Старый ключ уже не позволяет начать работу. После успешного `/start`
+задание никогда автоматически не возвращается в очередь, даже если подтверждение
+не дошло до клиента: такой исход позже станет unknown.
 
-Проверены шесть сквозных заданий (четыре одновременно, два в ожидании), stdout,
-hostname, whoami, exit 7 и таймаут. Локальные тесты:
+Обновляйте сервер и все клиенты при остановленных процессах. Скопируйте рядом с
+https_remote.py также windows_job.py, затем переустановите задачу. Сделайте резервную
+копию SQLite с корректным учётом WAL (остановите сервер и скопируйте базу и файлы
+`-wal`/`-shm`, если они есть). Миграция схемы автоматическая. Старые queued получают
+TTL от времени создания, старые running не переисполняются. Старый клиент получает
+409 до выдачи задания. Старые ответы без ключа выдачи останутся в карантине для
+ручного разбора; не удаляйте их до проверки состояния ПК.
+
+Повреждённые spool/*.json переименовываются в .bad; окончательно отвергнутые сервером
+— в .rejected. Они не блокируют другие ответы и получение заданий. Запись результата
+использует flush/fsync перед атомарной заменой. Ошибки фоновых работников пишутся в
+`client.log` рядом с client.json; ротация — 2 МиБ и три резервных файла.
+На сервере ошибки и неудачные авторизации видны в journalctl. Тексты команд, ответы
+и секреты в эти журналы не пишутся.
+
+SYSTEM-установка допускает Python только внутри Program Files и проверяет владельцев,
+права записи и отсутствие точек перенаправления в дереве Python и родительских
+каталогах до Program Files. Не используйте пользовательские библиотеки/интерпретатор.
+Установщик запрещает Restricted/AllSigned и ограниченный языковой режим; клиент
+также проверяет политику в своей учётной записи перед заданием. Политики не меняются,
+Bypass не включается. Проверка: `Get-ExecutionPolicy -List`. AppLocker/WDAC и правила
+организации могут требовать дополнительного разрешения. Планировщик теперь разрешает
+работу от батареи. Один spool защищён межпроцессной блокировкой.
+
+В конфигурации клиента можно явно задать `"proxy": "http://proxy.example.com:8080"`.
+Пустая строка отключает прокси, отсутствие поля сохраняет стандартные настройки urllib.
+PAC и NTLM/Kerberos не реализованы. SYSTEM не наследует пользовательскую прокси-сессию.
+TLS проверяется системным хранилищем, но не закрепляется отдельным отпечатком: доверенная
+TLS-инспекция видит содержимое. Опрос пока остаётся коротким, без long polling.
 
 ```bash
-python -m unittest discover -s tests -v
+python3 https_remote.py submit --config /etc/agent-remote-https/operator.json windows-1 --script-file command.ps1 --timeout 300 --ttl 3600 --wait
+python3 https_remote.py list --config /etc/agent-remote-https/operator.json --client windows-1
+python3 https_remote.py cancel --config /etc/agent-remote-https/operator.json JOB_ID
+python3 https_remote.py purge --config /etc/agent-remote-https/server.json --days 30
 ```
 
-Проверяют очередь, токены, сохранение заданий, параллельный PowerShell и таймаут.
-PowerShell-тест выполняется только на Windows.
-По просьбе пользователя клиент и API остановлены, автозапуск отключён. Данные
-сохранены. Caddy и другие сайты работают; маршрут API даёт 502 до запуска backend.
-Старый Chisel-транспорт независим от HTTPS.
+TTL ограничивает ожидание начала задания (1–604800 секунд, по умолчанию час).
+cancel отменяет queued/claimed, но не running. list возвращает до 100 последних
+заданий и время последнего опроса клиентов. purge выполняется локально с доступом
+к базе и удаляет только завершённые/отменённые/просроченные записи. Делайте это при
+остановленном сервере с правами владельца базы. SQLite использует WAL и индекс очереди.
+В server.json можно добавить уникальный read_token; отдельная конфигурация оператора
+с этим токеном разрешает только status/list. Для ротации замените токен на обеих
+сторонах при остановленном клиенте и перезапустите сервер.
+
+## Границы доверия
+
+Сервер и токен оператора дают возможность выполнять код на клиентах с их правами.
+Подписей скриптов и автоматического определения опасных команд нет. Для разрушительных
+операций агент должен запрашивать подтверждение оператора. Вывод ПК считайте недоверенными
+данными, а не инструкциями агенту. Системный режим на рабочем ПК и постоянное соединение
+с сервером должны соответствовать разрешённой в организации схеме удалённого управления.

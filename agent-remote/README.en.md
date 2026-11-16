@@ -16,7 +16,7 @@ ports on the PC.
 
 Use it for files, Git, builds, processes and services within the client's account
 permissions. Mouse, screen and application-window control are not implemented.
-File transfer and job cancellation are not implemented either.
+File transfer and cancellation of running commands are not implemented either.
 
 ## Features
 
@@ -24,11 +24,13 @@ File transfer and job cancellation are not implemented either.
   jobs wait in the queue. Restart the client after changing the setting.
 - Persistent jobs and results in SQLite on the server.
 - Execution timeouts, bounded output and separate results for each job.
+- Waiting TTL, cancellation before execution, and job/client listings.
 - Local result spooling and retry after connectivity returns.
 - Separate tokens for each PC and the operator.
 - Client startup at user logon or Windows boot as SYSTEM.
 
-Claimed commands are never automatically replayed: they may already have changed
+Unacknowledged claims return to the queue after 60 seconds. A separate start
+acknowledgement is required; started commands are never automatically replayed: they may already have changed
 the PC. Inspect actual machine state before retrying a job with an unknown outcome.
 
 ## Installation and configuration
@@ -45,8 +47,10 @@ SYSTEM is not required for ordinary management; choose privileges for your tasks
 | --- | --- |
 | `https_remote.py` | Queue server, Windows client and operator CLI |
 | `scripts/install_https_client.ps1` | Windows background client installer |
+| `windows_job.py` | Windows Job Object execution and child-process cleanup |
 | [HTTPS_TRANSPORT.en.md](HTTPS_TRANSPORT.en.md) | Full installation and operation guide |
 | [AGENT_INSTRUCTIONS.en.md](AGENT_INSTRUCTIONS.en.md) | AI agent operating rules |
+| [REVIEW.en.md](REVIEW.en.md) | Review findings, fixes and remaining limitations |
 
 ## Command example
 
