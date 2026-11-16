@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.local/
+creds.txt
+client.json
+server.json
+operator.json
+windows-*-install.ps1
+windows-diagnostics.txt
+*.db
+*.db-journal
